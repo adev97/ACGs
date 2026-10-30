@@ -1,138 +1,245 @@
 # Kilosort ACGs
 
-A small Python package for full-recording autocorrelograms. Defaults: **1 ms bins,
-−15 to +15 ms lags, Kilosort `KSLabel == good`, firing-rate normalization**.
-Supports full-recording and already separated session ACGs.
+Create double-sided, firing-rate-normalized autocorrelograms for a full recording
+or for sessions that have already been separated. Edit the settings at the top of
+the appropriate runner and run it from your Python editor. No command-line
+parameters are required for either runner.
 
-## Individual sessions
+Both runners are currently configured for **1 ms bins and -500 to +500 ms lags**.
+Both use the same full-recording **Kilosort `KSLabel == good` cluster IDs**
+(131 clusters for the configured recording). No smoothing is applied.
 
-Open `run_session_acgs.py`, edit the settings at the top, and run the file directly
-from your Python editor (or `python run_session_acgs.py`). Its initial settings
-match the current full-recording runner: 1 ms bins and a -500 to +500 ms window.
+## 1. Install once
+
+Use Python 3.10 or newer. In a terminal, open this repository and install the package:
+
+```powershell
+cd "R:\Basic_Sciences\Phys\SenzaiLab\Aparna\Projects\ACGs"
+python -m pip install -e .
+```
+
+This installs NumPy, Matplotlib, and the local package. Use the same Python
+environment in your editor when running the scripts.
+
+## 2. Full-recording ACGs
+
+Open `run_full_recording.py`. Edit the settings at the top:
+
+```python
+from pathlib import Path
+
+BIN_MS = 1.0
+WINDOW_MS = 500.0  # Maximum lag on EACH side of zero.
+
+RECORDING_FOLDER = Path(
+    r"R:\Basic_Sciences\Phys\SenzaiLab\Aparna\Data_by_mouse\m002\small-spread-neuropixel-config\2026-09-25\ad_session_2026_09_25"
+)
+KILOSORT_DIR = RECORDING_FOLDER / "ProbeA"
+OUTPUT_FOLDER = RECORDING_FOLDER / "full_recording_acgs"
+DURATION_S = None
+```
+
+`RECORDING_FOLDER` must be a `Path` object before using `/` to append folders.
+Import `Path` above these settings. The input can be either `ProbeA` or
+`ProbeA/kilosort`; the loader automatically finds the Kilosort subfolder.
+
+Run the file using your editor's Run button, or from the repository terminal:
+
+```powershell
+python run_full_recording.py
+```
+
+The current output setting creates:
+
+```text
+<RECORDING_FOLDER>/
+  full_recording_acgs/
+    full_recording_bin1ms_window500ms_<timestamp>/
+      clusters/
+      overview.pdf
+      overview_01.png ...
+      acgs.npz
+      acgs.csv
+      clusters.csv
+      metadata.json
+```
+
+Leave `DURATION_S = None` to obtain the full duration from recording metadata
+and the raw binary's file size. The raw recording is not loaded. If the binary
+is unavailable, set `DURATION_S` to the known complete recording duration in
+seconds, including silent periods. The last spike time is not a duration estimate.
+
+The full recording is treated as one continuous observation, including pairs
+that span a boundary between the separated sessions.
+
+## 3. Individual-session ACGs
+
+Open `run_session_acgs.py`. Set `RECORDING_FOLDER` to the same recording root
+shown above, then edit these settings:
 
 ```python
 BIN_MS = 1.0
 WINDOW_MS = 500.0
-SESSION_NUMBERS = [1, 2, 3, 4, 5]  # Use [4] for session_04 only.
+SESSION_NUMBERS = [1, 2, 3, 4, 5]
+PROBE = "ProbeA"
+OUTPUT_FOLDER = RECORDING_FOLDER / "session_acgs"
 ```
 
-`RECORDING_FOLDER`, `PROBE`, and `OUTPUT_FOLDER` are editable there too. A relative
-output path is resolved against the script directory. Each run creates a timestamped
-folder containing separate `session_01`, `session_02`, etc. result folders. Each
-session gets the same PNG/PDF/CSV/NPZ exports as the full-recording workflow.
+To process only the receptive-field mapping session:
 
-Session input files:
+```python
+SESSION_NUMBERS = [4]
+```
 
-- `sessions/session_XX/session_info.npz`: true full session duration, ADC boundaries,
-  and explicit `session_local_adc_seconds` / `[start, end)` conventions.
-- `sessions/session_XX/neural/ProbeA/adc_spike_times.npy`: synchronized local spike
-  times in seconds. `spike_times_global.npy` is not interpreted as local time.
-- `sessions/session_XX/neural/ProbeA/spike_clusters.npy`: corresponding cluster IDs.
-- `ProbeA/kilosort/cluster_KSLabel.tsv`: the same 131 full-recording good IDs used
-  for the existing ACGs and RF maps. Per-session lists do not renumber the units.
+To process any subset, list the desired session numbers, for example `[1, 3, 5]`.
+Run the file from your editor, or use:
 
-Each session is processed independently: no spike pair crosses a session boundary.
-Normalization uses that cluster's **session spike count** divided by the **entire
-session duration**, including silent beginning/end periods. The baseline remains 1.
-ADC seconds are represented as integer nanoseconds internally (nearest 1 ns) to
-preserve the synchronized time base without rounding back to the acquisition sample
-grid. `sample_rate_hz` in exports remains the original acquisition sampling rate;
-session counting uses ADC seconds, not sample indices. No smoothing is applied.
-All 131 selected IDs are retained: a silent unit has zero counts/rate and NaN
-normalized values, with a no-spikes note in its plot. Counts of a single spike are
-zero because self pairs are excluded. Metadata records source paths and timing.
+```powershell
+python run_session_acgs.py
+```
 
-## Edit settings in a script
+With all five sessions selected, the current output setting creates:
 
-Open `run_full_recording.py` in the repository root and edit the settings at the top:
+```text
+<RECORDING_FOLDER>/
+  session_acgs/
+    bin1ms_window500ms_<timestamp>/
+      session_01/
+      session_02/
+      session_03/
+      session_04/
+      session_05/
+```
+
+Each session folder contains the same individual PNG plots, overview PDF/PNGs,
+and numerical files listed for the full recording. Session numbering matches
+the existing `sessions/session_XX` input folders.
+
+Sessions are processed independently: **no pair crosses a session boundary**.
+Normalization uses each cluster's session spike count and the entire session
+duration from `session_info.npz`, including silent beginning and end periods.
+The same selected cluster IDs are retained in every session. A silent cluster
+has zero counts and firing rate, NaN normalized values, and a no-spikes plot note.
+
+## Changing bin size, lag window, and output location
+
+Edit `BIN_MS` and `WINDOW_MS` in the runner you plan to use. For example:
 
 ```python
 BIN_MS = 1.0
-WINDOW_MS = 15.0  # -15 to +15 ms
+WINDOW_MS = 15.0  # -15 to +15 ms.
 ```
 
-Run that file from your Python editor, or run `python run_full_recording.py`.
-No command-line parameters are needed. The input recording path is also set at
-its top. Each run saves to a new folder under `outputs/`, named with the bin size,
-window, and timestamp, so you can rerun it without overwriting earlier results.
-Output paths are relative to the script, regardless of the current working folder.
-The same Kilosort good-cluster selection and firing-rate normalization are used.
-Install the package dependencies once using the instructions below.
+The window must be an integer multiple of the bin width. For full-recording
+sample times, each bin must also represent an integer number of acquisition
+samples. The observation duration must exceed the maximum lag.
 
-## Install and run
+`OUTPUT_FOLDER` may be an absolute path or a path relative to the runner's
+directory. With the settings above, both runners save alongside the recording.
+Each run creates a fresh timestamped subfolder so earlier runs are preserved.
+The underlying workflow refuses to overwrite a nonempty result folder.
 
-From this repository, using Python 3.10 or newer:
+## Input files and cluster identity
 
-```powershell
-python -m pip install -e .
-python -m acgs "R:\Basic_Sciences\Phys\SenzaiLab\Aparna\Data_by_mouse\m002\small-spread-neuropixel-config\2026-09-25\ad_session_2026_09_25\ProbeA" --output outputs/full_recording
-```
+Paths below are relative to `RECORDING_FOLDER`:
 
-The installed command `kilosort-acgs` accepts the same arguments. Both the `ProbeA`
-folder and its `kilosort` subfolder are accepted. Optional flags:
-`--bin-ms 1 --window-ms 15 --duration-s <seconds>`. An existing nonempty output
-folder is protected against overwriting; choose a new output folder for another run.
+| Input | Used for |
+| --- | --- |
+| `ProbeA/kilosort/cluster_KSLabel.tsv` | Select `cluster_id` rows where `KSLabel` is `good`, for both workflows. |
+| `ProbeA/kilosort/spike_times.npy` | Full-recording spike times in sample indices. |
+| `ProbeA/kilosort/spike_clusters.npy` | Full-recording cluster ID for each spike. |
+| `ProbeA/kilosort/params.py` | Acquisition sampling rate, read as literals without executing Python. |
+| `ProbeA/concat/binary.json` and its referenced raw binary | Full-recording duration from metadata and binary size. Falls back to `params.py` binary metadata when `binary.json` is absent. |
+| `sessions/session_XX/session_info.npz` | Session duration, ADC boundaries, and time-reference convention. |
+| `sessions/session_XX/neural/ProbeA/adc_spike_times.npy` | Synchronized session-local spike times in seconds. |
+| `sessions/session_XX/neural/ProbeA/spike_clusters.npy` | Session cluster ID for each spike. |
 
-## Cluster selection and time base
+The spike-time and cluster arrays align entry by entry. Selection uses
+`cluster_KSLabel.tsv`, not the separate curated `cluster_group.tsv` labels.
+Do not substitute template IDs or sequential unit indices for cluster IDs.
+For example, `cluster_254_acg.png` belongs to actual cluster 254.
 
-Read spike assignments from `spike_clusters.npy` and spike sample indices from
-`spike_times.npy`. Select cluster IDs from **`cluster_KSLabel.tsv`** where
-`KSLabel` is `good`. The separate Phy `group` labels are not used. For the specified
-recording, this selects **131 clusters**, whereas the curated `group` labels contain
-14 `good` entries. Do not substitute template IDs for cluster IDs.
+Session metadata must declare `session_local_adc_seconds` and `[start, end)`
+boundaries. `spike_times_global.npy` is not used as local session time. ADC
+seconds are represented internally as integer nanoseconds rounded to the nearest
+1 ns; they are not rounded back to the acquisition sample grid. In exported
+files, `sample_rate_hz` still records the acquisition rate (30,000 Hz here).
 
-Read the sample rate from `params.py` as literal data, without executing it.
-For the specified recording it is 30,000 Hz. Calculate the observation duration
-from `concat/binary.json` and the binary file size (subtracting any binary offset),
-without reading the raw recording. Fall back to `params.py` binary metadata when
-`concat/binary.json` is absent. If the raw binary is unavailable or has multiple
-segments, supply the true observation duration using `--duration-s`; the final
-spike time is not used as a duration estimate. All good-cluster spikes must fall
-within that duration. This full-recording workflow treats time as one continuous
-observation; it does not exclude pauses or session boundaries.
+## Counting and firing-rate normalization
 
-## Counting and normalization
+The ACG is symmetric about zero. With 1 ms bins and a 15 ms window there are
+30 bins spanning -15 to +15 ms; with a 500 ms window there are 1,000 bins.
+Zero is a boundary between the two central bins, not a dedicated zero-lag bin.
+Absolute-lag bins are left-inclusive and right-exclusive, with the outer window
+endpoint included in the final bin. Positive counts are mirrored to negative lags.
 
-There are **30 bins**, with edges −15, −14, …, 0, …, +14, +15 ms.
-Zero lies between the two central bins; centers are −14.5, …, −0.5, +0.5, …, +14.5 ms.
-For each distinct pair, calculate the absolute sample difference and count it on
-both sides. Absolute-lag bins are `[0,1)`, `[1,2)`, …, `[14,15]` ms; the outer
-endpoint is included. Mirror the positive counts to obtain exactly symmetric
-negative counts. Each spike's pairing with itself is excluded. Distinct spikes
-at the same sample are retained, with one count in each central bin. Bins must
-be an integer number of samples, and the window an integer number of bins.
+Each spike's pairing with itself is excluded. Distinct spikes at an identical
+time are retained, contributing one count to each central bin. Plots show the
+normalized bin counts directly, without Gaussian filtering, moving averages,
+or interpolation.
 
-Let `N` be the cluster spike count, `T` the full recording duration in seconds,
-`r = N/T` its mean firing rate in Hz, `dt` the bin width in seconds, and `tau` the
-bin center in seconds. The saved normalized ACG is dimensionless:
+For each cluster, let `N` be its spike count in the observation interval, `T` the
+interval duration in seconds, `r = N/T` its mean firing rate in Hz, `dt` the bin
+width in seconds, and `tau` the bin center in seconds:
 
 ```text
-normalized_acg(tau) = pair_count(tau) / [r² × dt × (T − |tau|)]
+normalized_acg(tau) = pair_count(tau) / [r^2 * dt * (T - |tau|)]
 ```
 
-Equivalently, divide counts by `N × dt` to obtain the conditional firing rate,
-then divide by mean firing rate `r`, with a finite-duration overlap correction
-`T/(T−|tau|)`. For an independent stationary train, the baseline is approximately
-**1**; the plots mark it with a dashed line. Sampling discretization and the
-inclusive outer endpoint can produce small deviations from a continuous-time
-baseline. Normalization uses the full recording mean rate; rate changes over the
-recording can affect the ACG. Empty clusters produce NaN normalized values.
+This divides counts by `N * dt` to obtain conditional firing rate, divides
+again by the mean firing rate `r`, and applies the finite-duration correction
+`T / (T - |tau|)`. For session ACGs, both `N` and `T` are session-specific.
 
-## Outputs
+The dashed line at **1** is the expected baseline for independent stationary
+spikes. It is not a statistical significance threshold. Values above/below 1
+indicate more/fewer pairs than that baseline. Rate changes within an interval,
+sampling discretization, and the inclusive outer endpoint can affect the baseline.
 
-- `clusters/cluster_<id>_acg.png`: individual normalized ACG plots.
-- `overview.pdf` and `overview_XX.png`: 20 clusters per page, with independent y scales.
-- `acgs.npz`: cluster IDs, bin edges/centers, raw counts, normalized ACGs,
-  spike counts, firing rates, sample rate, and duration.
-- `acgs.csv`: long-form raw and normalized counts for every cluster and bin.
-- `clusters.csv`: cluster spike counts and mean firing rates.
-- `metadata.json`: source paths, selected IDs, parameters, duration provenance,
-  normalization formula, and bin convention.
+## Result files
+
+| File | Contents |
+| --- | --- |
+| `clusters/cluster_<id>_acg.png` | Individual normalized ACG, actual cluster ID, spike count, and mean firing rate. |
+| `overview.pdf`, `overview_XX.png` | Overview pages, up to 20 clusters per page, with independent y scales. |
+| `acgs.npz` | Cluster IDs, bin edges/centers, raw counts, normalized values, spike counts, rates, sampling rate, and duration. |
+| `acgs.csv` | One row per cluster and bin, with raw and normalized counts. |
+| `clusters.csv` | Cluster IDs, spike counts, and mean firing rates. |
+| `metadata.json` | Parameters, selected IDs, source paths, time reference, normalization, and duration provenance. |
+
+Load numerical results by replacing the path below with a completed run folder:
 
 ```python
+from pathlib import Path
 import numpy as np
-data = np.load("outputs/full_recording/acgs.npz")
-print(data["cluster_ids"], data["normalized"].shape)
+
+result_folder = Path(r"R:\path\to\a\completed\run\session_04")
+data = np.load(result_folder / "acgs.npz")
+print(data["cluster_ids"])
+print(data["normalized"].shape)  # (number of clusters, number of bins)
 ```
 
-Run validation with `python -m unittest discover -s tests -v`.
+## Optional full-recording command line
+
+The script settings above are the normal workflow. The full-recording package
+also accepts command-line arguments; they are independent of the runner settings:
+
+```powershell
+python -m acgs "R:\Basic_Sciences\Phys\SenzaiLab\Aparna\Data_by_mouse\m002\small-spread-neuropixel-config\2026-09-25\ad_session_2026_09_25\ProbeA" --bin-ms 1 --window-ms 500 --output outputs/full_recording_500ms
+```
+
+The installed `kilosort-acgs` command accepts the same arguments. If omitted,
+the command-line defaults are 1 ms bins and a 15 ms window. `--duration-s`
+overrides the full-recording duration when needed. Choose a new output folder
+for another command-line run.
+
+## Validation
+
+From the repository, run:
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+Checks cover pair counting, bin boundaries, normalization, cluster-label selection,
+session timing, silent units, independent session processing, and the full-recording
+workflow.
