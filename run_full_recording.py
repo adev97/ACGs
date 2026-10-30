@@ -1,11 +1,15 @@
 """Edit the settings below, then run this file to generate full-recording ACGs."""
 
 # ---------- Edit these settings ----------
+from pathlib import Path
+
+
 BIN_MS = 1.0                 # Width of each bin in milliseconds.
 WINDOW_MS = 500.0             # Each side of zero: 15 means -15 to +15 ms.
 
-KILOSORT_DIR = r"R:\Basic_Sciences\Phys\SenzaiLab\Aparna\Data_by_mouse\m002\small-spread-neuropixel-config\2026-09-25\ad_session_2026_09_25\ProbeA"
-OUTPUT_FOLDER = r"R:\Basic_Sciences\Phys\SenzaiLab\Aparna\Data_by_mouse\m002\small-spread-neuropixel-config\2026-09-25\ad_session_2026_09_25\full_recording_acgs"    # Relative to this script, or an absolute path.
+RECORDING_FOLDER = Path(r"R:\Basic_Sciences\Phys\SenzaiLab\Aparna\Data_by_mouse\m002\small-spread-neuropixel-config\2026-09-25\ad_session_2026_09_25")
+KILOSORT_DIR = RECORDING_FOLDER / "ProbeA"
+OUTPUT_FOLDER = RECORDING_FOLDER / "full_recording_acgs"    # Relative to this script, or an absolute path.
 DURATION_S = None            # None reads the full duration from recording metadata.
 # ----------------------------------------
 

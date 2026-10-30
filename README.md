@@ -2,8 +2,45 @@
 
 A small Python package for full-recording autocorrelograms. Defaults: **1 ms bins,
 −15 to +15 ms lags, Kilosort `KSLabel == good`, firing-rate normalization**.
-Support for the already separated sessions can be added using the same computation
-function; this version runs the full recording only.
+Supports full-recording and already separated session ACGs.
+
+## Individual sessions
+
+Open `run_session_acgs.py`, edit the settings at the top, and run the file directly
+from your Python editor (or `python run_session_acgs.py`). Its initial settings
+match the current full-recording runner: 1 ms bins and a -500 to +500 ms window.
+
+```python
+BIN_MS = 1.0
+WINDOW_MS = 500.0
+SESSION_NUMBERS = [1, 2, 3, 4, 5]  # Use [4] for session_04 only.
+```
+
+`RECORDING_FOLDER`, `PROBE`, and `OUTPUT_FOLDER` are editable there too. A relative
+output path is resolved against the script directory. Each run creates a timestamped
+folder containing separate `session_01`, `session_02`, etc. result folders. Each
+session gets the same PNG/PDF/CSV/NPZ exports as the full-recording workflow.
+
+Session input files:
+
+- `sessions/session_XX/session_info.npz`: true full session duration, ADC boundaries,
+  and explicit `session_local_adc_seconds` / `[start, end)` conventions.
+- `sessions/session_XX/neural/ProbeA/adc_spike_times.npy`: synchronized local spike
+  times in seconds. `spike_times_global.npy` is not interpreted as local time.
+- `sessions/session_XX/neural/ProbeA/spike_clusters.npy`: corresponding cluster IDs.
+- `ProbeA/kilosort/cluster_KSLabel.tsv`: the same 131 full-recording good IDs used
+  for the existing ACGs and RF maps. Per-session lists do not renumber the units.
+
+Each session is processed independently: no spike pair crosses a session boundary.
+Normalization uses that cluster's **session spike count** divided by the **entire
+session duration**, including silent beginning/end periods. The baseline remains 1.
+ADC seconds are represented as integer nanoseconds internally (nearest 1 ns) to
+preserve the synchronized time base without rounding back to the acquisition sample
+grid. `sample_rate_hz` in exports remains the original acquisition sampling rate;
+session counting uses ADC seconds, not sample indices. No smoothing is applied.
+All 131 selected IDs are retained: a silent unit has zero counts/rate and NaN
+normalized values, with a no-spikes note in its plot. Counts of a single spike are
+zero because self pairs are excluded. Metadata records source paths and timing.
 
 ## Edit settings in a script
 

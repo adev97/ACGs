@@ -3,6 +3,24 @@
 import numpy as np
 
 
+def autocorrelogram_seconds(spike_seconds, duration_s, bin_ms=1.0, window_ms=15.0):
+    """ACG on session-local ADC seconds, using integer nanoseconds internally.
+
+    The 1 ns rounding avoids a second quantization onto the acquisition sample
+    grid after clock synchronization. It is unrelated to the plotting bin size.
+    """
+    seconds = np.asarray(spike_seconds, dtype=np.float64).reshape(-1)
+    if not np.isfinite(duration_s) or duration_s <= 0:
+        raise ValueError("Session duration must be positive and finite.")
+    if not np.isfinite(seconds).all() or np.any(seconds < 0) or np.any(seconds >= duration_s):
+        raise ValueError("Session spike times must be finite and within [0, duration_s).")
+    if duration_s * 1e9 >= np.iinfo(np.int64).max:
+        raise ValueError("Session duration exceeds the integer nanosecond range.")
+    ticks = np.rint(seconds * 1e9).astype(np.int64)
+    ticks = np.minimum(ticks, int(np.ceil(duration_s * 1e9)) - 1)
+    return autocorrelogram(ticks, 1e9, duration_s, bin_ms, window_ms)
+
+
 def autocorrelogram(spike_samples, sample_rate, duration_s, bin_ms=1.0, window_ms=15.0):
     """Return (edges_ms, counts, normalized).
 
